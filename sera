@@ -156,3 +156,41 @@ swc-vimeo-video:not(:defined) {
 👉 With this, you’ll have the same structure as your YouTube component, but working with Vimeo’s player API.
 
 Would you like me to combine both YouTube & Vimeo into a single generic swc-video-player component (with a provider="youtube|vimeo" prop), or do you prefer separate components?
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+<iframe
+  src="https://player.vimeo.com/video/1120532219?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
+  width="1760"
+  height="1320"
+  frameborder="0"
+  allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+  referrerpolicy="strict-origin-when-cross-origin"
+  title="Ochi-Showreel-fixed"
+></iframe>
+
+<div style="padding: 75% 0 0 0; position: relative">
+  <iframe
+    src="https://player.vimeo.com/video/1120536378?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
+    frameborder="0"
+    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+    referrerpolicy="strict-origin-when-cross-origin"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%"
+    title="Refokus-Showreel-Fixed"
+  ></iframe>
+</div>  
+<script src="https://player.vimeo.com/api/player.js"></script>
+
+<div style="padding: 75% 0 0 0; position: relative">
+  <iframe
+    src="https://player.vimeo.com/video/1120536378?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479"
+    frameborder="0"
+    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+    referrerpolicy="strict-origin-when-cross-origin"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%"
+    title="Refokus-Showreel-Fixed"
+  ></iframe>
+</div>
+<script src="https://player.vimeo.com/api/player.js"></script>
+
