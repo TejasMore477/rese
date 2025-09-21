@@ -1,0 +1,158 @@
+1. package.json
+
+No major changes except we add @vimeo/player as a dependency.
+
+{
+  "name": "vimeo_video",
+  "version": "1.0.0",
+  "main": "vimeo_video.webcomponent.ts",
+  "private": true,
+  "dependencies": {
+    "@vimeo/player": "^2.24.0"
+  }
+}
+
+2. vimeo_video.component.yml
+'$schema': 'https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json'
+name: '@syngenta-web-components/components/vimeo_video'
+status: stable
+libraryOverrides:
+  dependencies:
+    - syn_webcomponents_core/core
+    - syn_webcomponents_core_ui/core-ui/video
+  css:
+    component:
+      ../../../dist/components/video/vimeo_video/vimeo_video.min.css: { minified: true }
+props:
+  type: object
+  properties:
+    attributes:
+      type: Drupal\Core\Template\Attribute
+    video_id:
+      type: string
+    thumbnail_src:
+      type: ['string', 'null']
+    title:
+      type: string
+    plays_inline:
+      type: boolean
+
+3. vimeo_video.iframe-player-api.ts
+
+This is equivalent to your YouTube API wrapper but with Vimeo.
+
+import Player from "@vimeo/player";
+import type { VideoPlayerProviderFunctionType, VideoPlayerType } from "@internal/video/video-player-element";
+
+const VimeoVideoPlayer: VideoPlayerProviderFunctionType = (elementId, _initializedCallback, startedCallback) => {
+  const playerAPIReady = new Promise<Player>((resolve) => {
+    const player = new Player(elementId, {
+      id: elementId, // If elementId is a div with iframe, Vimeo handles it
+      autoplay: false,
+      playsinline: true,
+      muted: true,
+    });
+
+    player.on("loaded", () => {
+      console.info("Vimeo.Player ready()");
+      resolve(player);
+    });
+
+    player.on("play", () => {
+      if (typeof startedCallback === "function") {
+        startedCallback.apply(player);
+      }
+    });
+  });
+
+  return {
+    playVideo: () => {
+      playerAPIReady.then((player) => player.play());
+    },
+    pauseVideo: () => {
+      playerAPIReady.then((player) => player.pause());
+    },
+    isPlaying: () => {
+      return new Promise<void>((resolve, reject) => {
+        playerAPIReady.then(async (player) => {
+          const state = await player.getPaused();
+          if (!state) {
+            resolve();
+          } else {
+            reject();
+          }
+        });
+      });
+    },
+    destroy: () => {
+      playerAPIReady.then((player) => player.destroy());
+    },
+  } as VideoPlayerType;
+};
+
+export default VimeoVideoPlayer;
+
+4. vimeo_video.webcomponent.ts
+import {
+  html,
+  customElement,
+  property,
+  Styled,
+  GCMv2ConsentName,
+  nothing
+} from '@syngenta-web-components/core';
+
+import styles from './vimeo_video.webcomponent.css';
+import iconPlay from './vimeo_video.button.svg';
+
+import VimeoVideoPlayer from "./vimeo_video.iframe-player-api";
+import { VideoPlayerElement } from "@internal/video/video-player-element";
+
+const REQUIRED_CONSENTS: GCMv2ConsentName[] = ['ad_storage', 'ad_personalization', 'ad_user_data'];
+
+@customElement('swc-vimeo-video')
+export class VimeoVideo extends Styled(
+  styles,
+  VideoPlayerElement(REQUIRED_CONSENTS, iconPlay, VimeoVideoPlayer)
+) {
+  @property({ type: Boolean, attribute: 'loop' }) public loop: boolean = false;
+
+  getThumbnailSrc() {
+    return this.thumbnailSrc || `https://vumbnail.com/${this.videoId}.jpg`; 
+    // vumbnail.com gives Vimeo thumbnails
+  }
+
+  renderVideoIframe() {
+    return this.videoId ? html`
+        <iframe id="video"
+          src="https://player.vimeo.com/video/${this.videoId}?muted=1&autoplay=0&loop=${this.loop ? 1 : 0}&playsinline=1"
+          allow="autoplay; fullscreen; picture-in-picture"
+          frameborder="0"
+          allowfullscreen>
+        </iframe>` : nothing;
+  }
+}
+
+5. vimeo_video.twig
+{% if video_id %}
+  {% with { video_id, thumbnail_src, title, plays_inline, attributes } only %}
+    <swc-vimeo-video
+      video-id="{{ video_id }}"
+      thumbnail-src="{{ thumbnail_src }}"
+      title="{{ title }}"
+      {{ (plays_inline ? 'plays-inline' : '')|raw }}
+      {{ attributes }} >
+      {{ 'Playing this video requires a&nbsp;<b>marketing</b>&nbsp;consent.'|t }}
+    </swc-vimeo-video>
+  {% endwith %}
+{% endif %}
+
+6. CSS (similar to YouTube)
+swc-vimeo-video:not(:defined) {
+  visibility: hidden;
+}
+
+
+👉 With this, you’ll have the same structure as your YouTube component, but working with Vimeo’s player API.
+
+Would you like me to combine both YouTube & Vimeo into a single generic swc-video-player component (with a provider="youtube|vimeo" prop), or do you prefer separate components?
