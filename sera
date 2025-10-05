@@ -194,3 +194,207 @@ Would you like me to combine both YouTube & Vimeo into a single generic swc-vide
 </div>
 <script src="https://player.vimeo.com/api/player.js"></script>
 
+--------------------------------------
+----------------------------------------
+🧱 Folder structure
+
+You’ll have something like this (mirroring YouTube/Vimeo):
+
+/video/local_video/
+│
+├── local_video.webcomponent.ts
+├── local_video.webcomponent.css
+├── local_video.iframe-player-api.ts
+├── local_video.button.svg
+├── local_video.component.yml
+├── local_video.twig
+├── package.json
+└── tailwind.config.js
+
+1️⃣ local_video.iframe-player-api.ts
+
+This file wraps the HTML5 <video> element with the same play/pause API your system expects.
+
+import type { VideoPlayerProviderFunctionType, VideoPlayerType } from "@internal/video/video-player-element";
+
+const LocalVideoPlayer: VideoPlayerProviderFunctionType = (elementId, _initializedCallback, startedCallback) => {
+  const playerAPIReady = new Promise<HTMLVideoElement>((resolve) => {
+    const videoElement = document.getElementById(elementId) as HTMLVideoElement;
+
+    if (!videoElement) {
+      console.error("Local video element not found.");
+      return;
+    }
+
+    videoElement.addEventListener("loadeddata", () => {
+      console.info("Local Video ready()");
+      resolve(videoElement);
+    });
+
+    videoElement.addEventListener("play", () => {
+      if (typeof startedCallback === "function") {
+        startedCallback.apply(videoElement);
+      }
+    });
+  });
+
+  return {
+    playVideo: () => {
+      playerAPIReady.then((video) => video.play());
+    },
+    pauseVideo: () => {
+      playerAPIReady.then((video) => video.pause());
+    },
+    isPlaying: () => {
+      return new Promise<void>((resolve, reject) => {
+        playerAPIReady.then((video) => {
+          if (!video.paused && !video.ended) {
+            resolve();
+          } else {
+            reject();
+          }
+        });
+      });
+    },
+    destroy: () => {
+      playerAPIReady.then((video) => {
+        video.pause();
+        video.removeAttribute("src");
+        video.load(); // Release memory
+      });
+    },
+  } as VideoPlayerType;
+};
+
+export default LocalVideoPlayer;
+
+2️⃣ local_video.webcomponent.ts
+
+Now, the web component that integrates it into your system.
+
+import { html, customElement, property, Styled, GCMv2ConsentName, nothing } from '@syngenta-web-components/core';
+import styles from './local_video.webcomponent.css';
+import iconPlay from './local_video.button.svg';
+import LocalVideoPlayer from "./local_video.iframe-player-api";
+import { VideoPlayerElement } from "@internal/video/video-player-element";
+
+const REQUIRED_CONSENTS: GCMv2ConsentName[] = ['ad_storage', 'ad_personalization', 'ad_user_data'];
+
+@customElement('swc-local-video')
+export class LocalVideo extends Styled(
+  styles,
+  VideoPlayerElement(REQUIRED_CONSENTS, iconPlay, LocalVideoPlayer)
+) {
+  @property({ type: Boolean, attribute: 'loop' }) public loop: boolean = false;
+  @property({ type: Boolean, attribute: 'autoplay' }) public autoplay: boolean = false;
+  @property({ type: Boolean, attribute: 'muted' }) public muted: boolean = true;
+  @property({ type: String, attribute: 'src' }) public src: string = '';
+  @property({ type: String, attribute: 'poster' }) public poster: string | null = null;
+
+  getThumbnailSrc() {
+    return this.poster || this.thumbnailSrc || ''; // Optional
+  }
+
+  renderVideoIframe() {
+    return this.src ? html`
+      <video id="video"
+        src="${this.src}"
+        ?autoplay=${this.autoplay}
+        ?loop=${this.loop}
+        ?muted=${this.muted}
+        playsinline
+        preload="metadata"
+        poster="${this.getThumbnailSrc()}"
+        controls
+      ></video>
+    ` : nothing;
+  }
+}
+
+3️⃣ local_video.webcomponent.css
+
+Basic styling (you can extend later):
+
+@config 'tailwind.config.js';
+@tailwind base;
+@tailwind utilities;
+@tailwind components;
+
+:host {
+  display: block;
+
+  video {
+    @apply tw-w-full tw-h-auto tw-rounded-2xl;
+  }
+}
+
+4️⃣ local_video.twig
+
+Integrate with Drupal like the other components:
+
+{% if src %}
+  {% with { src, poster, title, attributes } only %}
+    <swc-local-video
+      src="{{ src }}"
+      poster="{{ poster }}"
+      title="{{ title }}"
+      {{ attributes }}>
+      {{ 'Playing this video requires a <b>marketing</b> consent.'|t }}
+    </swc-local-video>
+  {% endwith %}
+{% endif %}
+
+5️⃣ local_video.component.yml
+'$schema': 'https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json'
+name: '@syngenta-web-components/components/local_video'
+status: stable
+libraryOverrides:
+  dependencies:
+    - syn_webcomponents_core/core
+    - syn_webcomponents_core_ui/core-ui/video
+css:
+  component:
+    ../../../dist/components/video/local_video/local_video.min.css: { minified: true }
+props:
+  type: object
+  properties:
+    attributes:
+      type: Drupal\Core\Template\Attribute
+    src:
+      type: string
+    poster:
+      type: ['string', 'null']
+    title:
+      type: string
+    loop:
+      type: boolean
+    autoplay:
+      type: boolean
+    muted:
+      type: boolean
+
+6️⃣ package.json
+{
+  "name": "local_video",
+  "version": "1.0.0",
+  "description": "Local/HTML5 video web component",
+  "main": "local_video.webcomponent.ts",
+  "private": true
+}
+
+✅ Usage Example
+<swc-local-video
+  src="https://cdn.mysite.com/videos/demo.mp4"
+  poster="https://cdn.mysite.com/thumbnails/demo.jpg"
+  loop
+  autoplay
+  muted>
+</swc-local-video>
+
+💡 How It Works (in short)
+Step	Description
+1	The web component <swc-local-video> renders a <video> element
+2	The LocalVideoPlayer script connects to that <video> by id
+3	It exposes a consistent API → playVideo(), pauseVideo(), destroy()
+4	This allows the parent system (VideoPlayerElement) to control it just like YouTube/Vimeo
+5	Works both for local videos and CDN-hosted .mp4, .webm, etc.
